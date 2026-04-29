@@ -8,6 +8,9 @@ fn main() {
     println!("=== Solution Exercice 5 ===\n");
     solution_5_1();
     solution_5_2();
+    solution_5_3();
+    solution_5_4();
+    solution_5_5();
 }
 
 // --- 5.1 : Manipulation de Vec ---
@@ -131,4 +134,199 @@ fn solution_5_2() {
 
     println!();
 }
+
+// --- 5.3 : Chaines d'iterateurs ---
+
+fn solution_5_3() {
+    println!("--- 5.3 : Chaines d'iterateurs ---");
+
+    // 1. FizzBuzz
+    let fizzbuzz: Vec<String> = (1..=15)
+        .map(|n| match (n % 3, n % 5) {
+            (0, 0) => "FizzBuzz".to_string(),
+            (0, _) => "Fizz".to_string(),
+            (_, 0) => "Buzz".to_string(),
+            _ => n.to_string(),
+        })
+        .collect();
+    println!("  FizzBuzz : {:?}", fizzbuzz);
+
+    // 2. Produit scalaire
+    let a = vec![1, 2, 3, 4, 5];
+    let b = vec![2, 3, 4, 5, 6];
+    let produit_scalaire: i32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+    println!("  Produit scalaire {:?} . {:?} = {}", a, b, produit_scalaire);
+
+    // 3. 10 premiers nombres premiers
+    let premiers: Vec<u64> = (2u64..)
+        .filter(|&n| {
+            if n < 2 {
+                return false;
+            }
+            let limite = (n as f64).sqrt() as u64;
+            (2..=limite).all(|d| n % d != 0)
+        })
+        .take(10)
+        .collect();
+    println!("  10 premiers nombres premiers : {:?}", premiers);
+
+    // 4. Somme de matrice
+    let matrice = vec![vec![1, 2, 3], vec![4, 5, 6], vec![7, 8, 9]];
+    let sommes_lignes: Vec<i32> = matrice.iter().map(|ligne| ligne.iter().sum()).collect();
+    let somme_totale: i32 = sommes_lignes.iter().sum();
+    println!("  Sommes par ligne : {:?}", sommes_lignes);
+    println!("  Somme totale : {}", somme_totale);
+
+    println!();
+}
+
+// --- 5.4 : RLE Encoder ---
+
+struct RleEncoder<I: Iterator> {
+    iter: I,
+    courant: Option<I::Item>,
+}
+
+impl<I: Iterator> RleEncoder<I> {
+    fn new(mut iter: I) -> Self {
+        let courant = iter.next();
+        RleEncoder { iter, courant }
+    }
+}
+
+impl<I> Iterator for RleEncoder<I>
+where
+    I: Iterator,
+    I::Item: PartialEq + Clone,
+{
+    type Item = (I::Item, usize);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let courant = self.courant.take()?;
+        let mut count = 1;
+
+        loop {
+            match self.iter.next() {
+                Some(val) if val == courant => {
+                    count += 1;
+                }
+                other => {
+                    self.courant = other;
+                    return Some((courant, count));
+                }
+            }
+        }
+    }
+}
+
+fn rle_decode<T: Clone>(encoded: &[(T, usize)]) -> Vec<T> {
+    encoded
+        .iter()
+        .flat_map(|(val, count)| std::iter::repeat(val.clone()).take(*count))
+        .collect()
+}
+
+fn solution_5_4() {
+    println!("--- 5.4 : RLE ---");
+
+    // Entiers
+    let data = vec![1, 1, 1, 2, 2, 3, 1, 1];
+    let encoded: Vec<_> = RleEncoder::new(data.iter().cloned()).collect();
+    println!("  Encode {:?} -> {:?}", data, encoded);
+
+    let decoded = rle_decode(&encoded);
+    println!("  Decode -> {:?}", decoded);
+    assert_eq!(data, decoded);
+
+    // Caracteres
+    let texte = "aaabbbccda";
+    let encoded_chars: Vec<_> = RleEncoder::new(texte.chars()).collect();
+    println!("  Encode '{}' -> {:?}", texte, encoded_chars);
+
+    let decoded_str: String = rle_decode(&encoded_chars).into_iter().collect();
+    println!("  Decode -> '{}'", decoded_str);
+    assert_eq!(texte, decoded_str);
+
+    println!();
+}
+
+// --- 5.5 : Index inverse ---
+
+struct IndexInverse {
+    index: HashMap<String, HashSet<u32>>,
+    documents: HashMap<u32, String>,
+}
+
+impl IndexInverse {
+    fn new() -> Self {
+        IndexInverse {
+            index: HashMap::new(),
+            documents: HashMap::new(),
+        }
+    }
+
+    fn indexer(&mut self, id: u32, contenu: &str) {
+        self.documents.insert(id, contenu.to_string());
+
+        for mot in contenu.split_whitespace() {
+            let mot_propre = mot
+                .trim_matches(|c: char| !c.is_alphanumeric())
+                .to_lowercase();
+            if !mot_propre.is_empty() {
+                self.index
+                    .entry(mot_propre)
+                    .or_insert_with(HashSet::new)
+                    .insert(id);
+            }
+        }
+    }
+
+    fn rechercher(&self, mot: &str) -> HashSet<u32> {
+        self.index
+            .get(&mot.to_lowercase())
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    fn rechercher_multi(&self, mots: &[&str]) -> HashSet<u32> {
+        let mut resultats: Option<HashSet<u32>> = None;
+        for mot in mots {
+            let ids = self.rechercher(mot);
+            resultats = Some(match resultats {
+                Some(existant) => existant.intersection(&ids).cloned().collect(),
+                None => ids,
+            });
+        }
+        resultats.unwrap_or_default()
+    }
+}
+
+fn solution_5_5() {
+    println!("--- 5.5 : Index inverse ---");
+
+    let mut index = IndexInverse::new();
+    index.indexer(1, "Rust est un langage de programmation systeme");
+    index.indexer(2, "Python est un langage de programmation interprete");
+    index.indexer(3, "Rust offre la securite memoire sans garbage collector");
+    index.indexer(4, "Python est populaire pour le machine learning");
+    index.indexer(5, "Rust et Python sont des langages modernes");
+
+    // Recherche simple
+    let res = index.rechercher("rust");
+    println!("  'rust' -> documents {:?}", res);
+
+    let res = index.rechercher("programmation");
+    println!("  'programmation' -> documents {:?}", res);
+
+    // Recherche multi-mots (AND)
+    let res = index.rechercher_multi(&["rust", "securite"]);
+    println!("  'rust' AND 'securite' -> documents {:?}", res);
+
+    let res = index.rechercher_multi(&["langage", "programmation"]);
+    println!("  'langage' AND 'programmation' -> documents {:?}", res);
+
+    let res = index.rechercher_multi(&["python", "rust"]);
+    println!("  'python' AND 'rust' -> documents {:?}", res);
+}
+
 
